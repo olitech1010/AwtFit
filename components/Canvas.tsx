@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useState } from 'react';
-import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon, SaveIcon, ShareIcon } from './icons';
 import Spinner from './Spinner';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -16,9 +16,13 @@ interface CanvasProps {
   poseInstructions: string[];
   currentPoseIndex: number;
   availablePoseKeys: string[];
+  onSaveOutfit: () => void;
+  onShare: () => void;
+  saveConfirmation: string;
+  canSave: boolean;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading, loadingMessage, onSelectPose, poseInstructions, currentPoseIndex, availablePoseKeys }) => {
+const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading, loadingMessage, onSelectPose, poseInstructions, currentPoseIndex, availablePoseKeys, onSaveOutfit, onShare, saveConfirmation, canSave }) => {
   const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
   
   const handlePreviousPose = () => {
@@ -27,7 +31,6 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
     const currentPoseInstruction = poseInstructions[currentPoseIndex];
     const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
     
-    // Fallback if current pose not in available list (shouldn't happen)
     if (currentIndexInAvailable === -1) {
         onSelectPose((currentPoseIndex - 1 + poseInstructions.length) % poseInstructions.length);
         return;
@@ -48,7 +51,6 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
     const currentPoseInstruction = poseInstructions[currentPoseIndex];
     const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
 
-    // Fallback or if there are no generated poses yet
     if (currentIndexInAvailable === -1 || availablePoseKeys.length === 0) {
         onSelectPose((currentPoseIndex + 1) % poseInstructions.length);
         return;
@@ -56,14 +58,12 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
     
     const nextIndexInAvailable = currentIndexInAvailable + 1;
     if (nextIndexInAvailable < availablePoseKeys.length) {
-        // There is another generated pose, navigate to it
         const nextPoseInstruction = availablePoseKeys[nextIndexInAvailable];
         const newGlobalPoseIndex = poseInstructions.indexOf(nextPoseInstruction);
         if (newGlobalPoseIndex !== -1) {
             onSelectPose(newGlobalPoseIndex);
         }
     } else {
-        // At the end of generated poses, generate the next one from the master list
         const newGlobalPoseIndex = (currentPoseIndex + 1) % poseInstructions.length;
         onSelectPose(newGlobalPoseIndex);
     }
@@ -71,14 +71,50 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
   
   return (
     <div className="w-full h-full flex items-center justify-center p-4 relative animate-zoom-in group">
-      {/* Start Over Button */}
-      <button 
-          onClick={onStartOver}
-          className="absolute top-4 left-4 z-30 flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm"
-      >
-          <RotateCcwIcon className="w-4 h-4 mr-2" />
-          Start Over
-      </button>
+      {/* Top Buttons */}
+      <div className="absolute top-4 left-4 right-4 z-30 flex justify-between items-center">
+        <button 
+            onClick={onStartOver}
+            className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm"
+        >
+            <RotateCcwIcon className="w-4 h-4 mr-2" />
+            Start Over
+        </button>
+
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={onSaveOutfit}
+                disabled={!canSave || isLoading}
+                className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <SaveIcon className="w-4 h-4 mr-2" />
+                Save Outfit
+            </button>
+             <button 
+                onClick={onShare}
+                disabled={isLoading}
+                className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <ShareIcon className="w-4 h-4 mr-2" />
+                Share
+            </button>
+        </div>
+      </div>
+      
+      {/* Save Confirmation Toast */}
+      <AnimatePresence>
+        {saveConfirmation && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-16 z-30 bg-green-100 border border-green-300 text-green-800 text-sm font-semibold px-4 py-2 rounded-full"
+          >
+            {saveConfirmation}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
 
       {/* Image Display or Placeholder */}
       <div className="relative w-full h-full flex items-center justify-center">

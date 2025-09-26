@@ -38,3 +38,56 @@ export function getFriendlyErrorMessage(error: unknown, context: string): string
     
     return `${context}. ${rawMessage}`;
 }
+
+// Helper to convert image URL to a File object.
+export const urlToFile = (url: string, filename: string): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        // Use fetch for better CORS handling and universal applicability
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok, status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const mimeType = blob.type || 'image/png';
+                const file = new File([blob], filename, { type: mimeType });
+                resolve(file);
+            })
+            .catch(fetchError => {
+                // Fallback to canvas method for data URLs or when fetch fails for other reasons
+                const image = new Image();
+                image.setAttribute('crossOrigin', 'anonymous');
+
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = image.naturalWidth;
+                    canvas.height = image.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        return reject(new Error('Could not get canvas context.'));
+                    }
+                    ctx.drawImage(image, 0, 0);
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            return reject(new Error('Canvas toBlob failed.'));
+                        }
+                        const mimeType = blob.type || 'image/png';
+                        const file = new File([blob], filename, { type: mimeType });
+                        resolve(file);
+                    }, 'image/png');
+                };
+
+                image.onerror = (errorEvent) => {
+                    const errorMessage = errorEvent instanceof ErrorEvent 
+                        ? errorEvent.message 
+                        : 'Could not load image for conversion';
+                    console.error("Original fetch error:", fetchError);
+                    reject(new Error(`Could not load image from URL. ${errorMessage}`));
+                };
+                
+                image.src = url;
+            });
+    });
+};

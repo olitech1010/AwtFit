@@ -7,15 +7,17 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StartScreen from './components/StartScreen';
 import Canvas from './components/Canvas';
-import WardrobePanel from './components/WardrobeModal';
+import WardrobePanel from './components/WardrobePanel';
+import SavedOutfitsPanel from './components/SavedOutfitsPanel';
 import OutfitStack from './components/OutfitStack';
 import { generateVirtualTryOnImage, generatePoseVariation } from './services/geminiService';
-import { OutfitLayer, WardrobeItem } from './types';
-import { ChevronDownIcon, ChevronUpIcon } from './components/icons';
+import { OutfitLayer, WardrobeItem, SavedOutfit } from './types';
+import { ChevronDownIcon, ChevronUpIcon, SaveIcon, ShareIcon } from './components/icons';
 import { defaultWardrobe } from './wardrobe';
 import Footer from './components/Footer';
-import { getFriendlyErrorMessage } from './lib/utils';
+import { getFriendlyErrorMessage, urlToFile } from './lib/utils';
 import Spinner from './components/Spinner';
+import ShareModal from './components/ShareModal';
 
 const POSE_INSTRUCTIONS = [
   "Full frontal view, hands on hips",
@@ -33,16 +35,13 @@ const useMediaQuery = (query: string): boolean => {
     const mediaQueryList = window.matchMedia(query);
     const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
 
-    // DEPRECATED: mediaQueryList.addListener(listener);
     mediaQueryList.addEventListener('change', listener);
     
-    // Check again on mount in case it changed between initial state and effect runs
     if (mediaQueryList.matches !== matches) {
       setMatches(mediaQueryList.matches);
     }
 
     return () => {
-      // DEPRECATED: mediaQueryList.removeListener(listener);
       mediaQueryList.removeEventListener('change', listener);
     };
   }, [query, matches]);
@@ -61,7 +60,33 @@ const App: React.FC = () => {
   const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
   const [isSheetCollapsed, setIsSheetCollapsed] = useState(false);
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>(defaultWardrobe);
+  const [activeTab, setActiveTab] = useState<'wardrobe' | 'saved'>('wardrobe');
+  const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
+  const [saveConfirmation, setSaveConfirmation] = useState('');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
+
+  // Load saved outfits from localStorage on initial render
+  useEffect(() => {
+    try {
+      const storedOutfits = localStorage.getItem('savedOutfits');
+      if (storedOutfits) {
+        setSavedOutfits(JSON.parse(storedOutfits));
+      }
+    } catch (e) {
+      console.error("Failed to load saved outfits from localStorage", e);
+    }
+  }, []);
+
+  // Save outfits to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('savedOutfits', JSON.stringify(savedOutfits));
+    } catch (e) {
+      console.error("Failed to save outfits to localStorage", e);
+    }
+  }, [savedOutfits]);
+
 
   const activeOutfitLayers = useMemo(() => 
     outfitHistory.slice(0, currentOutfitIndex + 1), 
@@ -79,8 +104,6 @@ const App: React.FC = () => {
     if (!currentLayer) return modelImageUrl;
 
     const poseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
-    // Return the image for the current pose, or fallback to the first available image for the current layer.
-    // This ensures an image is shown even while a new pose is generating.
     return currentLayer.poseImages[poseInstruction] ?? Object.values(currentLayer.poseImages)[0];
   }, [outfitHistory, currentOutfitIndex, currentPoseIndex, modelImageUrl]);
 
@@ -114,11 +137,10 @@ const App: React.FC = () => {
   const handleGarmentSelect = useCallback(async (garmentFile: File, garmentInfo: WardrobeItem) => {
     if (!displayImageUrl || isLoading) return;
 
-    // Caching: Check if we are re-applying a previously generated layer
     const nextLayer = outfitHistory[currentOutfitIndex + 1];
     if (nextLayer && nextLayer.garment?.id === garmentInfo.id) {
         setCurrentOutfitIndex(prev => prev + 1);
-        setCurrentPoseIndex(0); // Reset pose when changing layer
+        setCurrentPoseIndex(0);
         return;
     }
 
@@ -128,7 +150,7 @@ const App: React.FC = () => {
 
     try {
       const newImageUrl = await generateVirtualTryOnImage(displayImageUrl, garmentFile);
-      const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
+      const currentPoseInstruction = POSE_INSTRUCTIONS[0]; // Always default to first pose when adding
       
       const newLayer: OutfitLayer = { 
         garment: garmentInfo, 
@@ -136,17 +158,14 @@ const App: React.FC = () => {
       };
 
       setOutfitHistory(prevHistory => {
-        // Cut the history at the current point before adding the new layer
         const newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
         return [...newHistory, newLayer];
       });
       setCurrentOutfitIndex(prev => prev + 1);
+      setCurrentPoseIndex(0);
       
-      // Add to personal wardrobe if it's not already there
       setWardrobe(prev => {
-        if (prev.find(item => item.id === garmentInfo.id)) {
-            return prev;
-        }
+        if (prev.find(item => item.id === garmentInfo.id)) return prev;
         return [...prev, garmentInfo];
       });
     } catch (err) {
@@ -155,12 +174,12 @@ const App: React.FC = () => {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [displayImageUrl, isLoading, currentPoseIndex, outfitHistory, currentOutfitIndex]);
+  }, [displayImageUrl, isLoading, outfitHistory, currentOutfitIndex]);
 
   const handleRemoveLastGarment = () => {
     if (currentOutfitIndex > 0) {
       setCurrentOutfitIndex(prevIndex => prevIndex - 1);
-      setCurrentPoseIndex(0); // Reset pose to default when removing a layer
+      setCurrentPoseIndex(0);
     }
   };
   
@@ -170,23 +189,19 @@ const App: React.FC = () => {
     const poseInstruction = POSE_INSTRUCTIONS[newIndex];
     const currentLayer = outfitHistory[currentOutfitIndex];
 
-    // If pose already exists, just update the index to show it.
     if (currentLayer.poseImages[poseInstruction]) {
       setCurrentPoseIndex(newIndex);
       return;
     }
 
-    // Pose doesn't exist, so generate it.
-    // Use an existing image from the current layer as the base.
     const baseImageForPoseChange = Object.values(currentLayer.poseImages)[0];
-    if (!baseImageForPoseChange) return; // Should not happen
+    if (!baseImageForPoseChange) return;
 
     setError(null);
     setIsLoading(true);
     setLoadingMessage(`Changing pose...`);
     
     const prevPoseIndex = currentPoseIndex;
-    // Optimistically update the pose index so the pose name changes in the UI
     setCurrentPoseIndex(newIndex);
 
     try {
@@ -199,13 +214,89 @@ const App: React.FC = () => {
       });
     } catch (err) {
       setError(getFriendlyErrorMessage(err, 'Failed to change pose'));
-      // Revert pose index on failure
       setCurrentPoseIndex(prevPoseIndex);
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
     }
   }, [currentPoseIndex, outfitHistory, isLoading, currentOutfitIndex]);
+
+  const handleSaveOutfit = () => {
+    if (activeOutfitLayers.length <= 1 || !displayImageUrl) {
+        alert("Add at least one garment to save an outfit.");
+        return;
+    }
+    const outfitName = prompt("Enter a name for your outfit:", "My New Look");
+    if (outfitName) {
+      const newSavedOutfit: SavedOutfit = {
+        id: `outfit-${Date.now()}`,
+        name: outfitName,
+        garmentIds: activeGarmentIds,
+        previewUrl: displayImageUrl,
+      };
+      setSavedOutfits(prev => [newSavedOutfit, ...prev]);
+      setSaveConfirmation(`Outfit "${outfitName}" saved!`);
+      setTimeout(() => setSaveConfirmation(''), 3000);
+    }
+  };
+
+  const applyGarmentSequence = async (garmentIds: string[]) => {
+    let baseImage = outfitHistory[0]?.poseImages[POSE_INSTRUCTIONS[0]];
+    if (!baseImage) {
+        setError("Base model image is not available.");
+        return;
+    }
+
+    const newLayers: OutfitLayer[] = [outfitHistory[0]];
+    
+    for (const garmentId of garmentIds) {
+        const garmentInfo = wardrobe.find(g => g.id === garmentId);
+        if (garmentInfo) {
+            try {
+                setLoadingMessage(`Applying ${garmentInfo.name}...`);
+                const garmentFile = await urlToFile(garmentInfo.url, garmentInfo.name);
+                const newImageUrl = await generateVirtualTryOnImage(baseImage, garmentFile);
+                
+                const newLayer: OutfitLayer = { 
+                    garment: garmentInfo, 
+                    poseImages: { [POSE_INSTRUCTIONS[0]]: newImageUrl } 
+                };
+                newLayers.push(newLayer);
+                baseImage = newImageUrl;
+
+                // Update UI progressively
+                setOutfitHistory([...newLayers]);
+                setCurrentOutfitIndex(newLayers.length - 1);
+            } catch (err) {
+                setError(getFriendlyErrorMessage(err, `Failed to apply ${garmentInfo.name}`));
+                return; // Stop the sequence on error
+            }
+        }
+    }
+  };
+
+  const handleApplySavedOutfit = async (outfit: SavedOutfit) => {
+    if (isLoading) return;
+    setError(null);
+    setIsLoading(true);
+    setLoadingMessage(`Loading outfit: ${outfit.name}`);
+    
+    setCurrentOutfitIndex(0);
+    setCurrentPoseIndex(0);
+    // Wait for state to settle before applying new sequence
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    await applyGarmentSequence(outfit.garmentIds);
+
+    setIsLoading(false);
+    setLoadingMessage('');
+  };
+
+  const handleDeleteSavedOutfit = (outfitId: string) => {
+    if (window.confirm("Are you sure you want to delete this outfit?")) {
+      setSavedOutfits(prev => prev.filter(o => o.id !== outfitId));
+    }
+  };
 
   const viewVariants = {
     initial: { opacity: 0, y: 15 },
@@ -249,6 +340,10 @@ const App: React.FC = () => {
                   poseInstructions={POSE_INSTRUCTIONS}
                   currentPoseIndex={currentPoseIndex}
                   availablePoseKeys={availablePoseKeys}
+                  onSaveOutfit={handleSaveOutfit}
+                  onShare={() => setIsShareModalOpen(true)}
+                  saveConfirmation={saveConfirmation}
+                  canSave={activeGarmentIds.length > 0}
                 />
               </div>
 
@@ -274,12 +369,42 @@ const App: React.FC = () => {
                       outfitHistory={activeOutfitLayers}
                       onRemoveLastGarment={handleRemoveLastGarment}
                     />
-                    <WardrobePanel
-                      onGarmentSelect={handleGarmentSelect}
-                      activeGarmentIds={activeGarmentIds}
-                      isLoading={isLoading}
-                      wardrobe={wardrobe}
-                    />
+
+                    {/* Tabbed Panel */}
+                    <div className="border-t border-gray-400/50 pt-6">
+                        <div className="flex border-b border-gray-200">
+                            <button onClick={() => setActiveTab('wardrobe')} className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'wardrobe' ? 'border-b-2 border-gray-800 text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>Wardrobe</button>
+                            <button onClick={() => setActiveTab('saved')} className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'saved' ? 'border-b-2 border-gray-800 text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>Saved Outfits</button>
+                        </div>
+                        <div className="pt-4">
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={activeTab}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    {activeTab === 'wardrobe' ? (
+                                        <WardrobePanel
+                                            onGarmentSelect={handleGarmentSelect}
+                                            activeGarmentIds={activeGarmentIds}
+                                            isLoading={isLoading}
+                                            wardrobe={wardrobe}
+                                        />
+                                    ) : (
+                                        <SavedOutfitsPanel
+                                            outfits={savedOutfits}
+                                            onApply={handleApplySavedOutfit}
+                                            onDelete={handleDeleteSavedOutfit}
+                                            isLoading={isLoading}
+                                        />
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
                   </div>
               </aside>
             </main>
@@ -298,6 +423,7 @@ const App: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+            <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} imageUrl={displayImageUrl} />
           </motion.div>
         )}
       </AnimatePresence>
