@@ -7,6 +7,9 @@ export interface WardrobeItem {
   id: string;
   name: string;
   url: string;
+  brand?: string;
+  material?: string;
+  price?: number;
 }
 
 export interface OutfitLayer {

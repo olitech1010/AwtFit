@@ -11,10 +11,16 @@ export const defaultWardrobe: WardrobeItem[] = [
     id: 'gemini-sweat',
     name: 'Gemini Sweat',
     url: 'https://raw.githubusercontent.com/ammaarreshi/app-images/refs/heads/main/gemini-sweat-2.png',
+    brand: 'Google Store',
+    material: '80% Cotton, 20% Polyester',
+    price: 59.99,
   },
   {
     id: 'gemini-tee',
     name: 'Gemini Tee',
     url: 'https://raw.githubusercontent.com/ammaarreshi/app-images/refs/heads/main/Gemini-tee.png',
+    brand: 'Google Store',
+    material: '100% Organic Cotton',
+    price: 24.99,
   }
 ];
