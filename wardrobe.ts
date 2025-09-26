@@ -22,5 +22,13 @@ export const defaultWardrobe: WardrobeItem[] = [
     brand: 'Google Store',
     material: '100% Organic Cotton',
     price: 24.99,
+  },
+  {
+    id: 'google-cloud-jacket',
+    name: 'Cloud Jacket',
+    url: 'https://raw.githubusercontent.com/ammaarreshi/app-images/main/google-cloud-jacket.png',
+    brand: 'Google Cloud',
+    material: '100% Recycled Polyester',
+    price: 85.50,
   }
 ];

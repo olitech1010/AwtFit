@@ -66,11 +66,17 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
                     >
                         <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
                     </button>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        <p className="text-white font-bold text-sm truncate">{item.name}</p>
-                        {item.brand && <p className="text-gray-200 text-xs truncate">{item.brand}</p>}
-                        {item.material && <p className="text-gray-300 text-xs truncate">{item.material}</p>}
-                        {item.price && <p className="text-white font-semibold text-sm mt-1">${item.price.toFixed(2)}</p>}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex flex-col justify-end">
+                        <div>
+                            <p className="text-white font-bold text-sm truncate">{item.name}</p>
+                            <div className="flex justify-between items-end mt-1">
+                                <div className="text-gray-200 text-xs truncate max-w-[70%]">
+                                    {item.brand && <p className="truncate">{item.brand}</p>}
+                                    {item.material && <p className="truncate italic opacity-80">{item.material}</p>}
+                                </div>
+                                {item.price && <p className="text-white font-semibold text-base">₵{item.price.toFixed(2)}</p>}
+                            </div>
+                        </div>
                     </div>
                     {isActive && (
                         <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center rounded-lg pointer-events-none">
