@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useState } from 'react';
-import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon, SaveIcon, ShareIcon } from './icons';
+import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon, SaveIcon, ShareIcon, CheckCircleIcon } from './icons';
 import Spinner from './Spinner';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -71,50 +71,60 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
   
   return (
     <div className="w-full h-full flex items-center justify-center p-4 relative animate-zoom-in group">
-      {/* Top Buttons */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex justify-between items-center">
-        <button 
-            onClick={onStartOver}
-            className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm"
-        >
-            <RotateCcwIcon className="w-4 h-4 mr-2" />
-            Start Over
-        </button>
-
-        <div className="flex items-center gap-2">
-            <button 
-                onClick={onSaveOutfit}
-                disabled={!canSave || isLoading}
-                className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <SaveIcon className="w-4 h-4 mr-2" />
-                Save Outfit
-            </button>
-             <button 
-                onClick={onShare}
-                disabled={isLoading}
-                className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <ShareIcon className="w-4 h-4 mr-2" />
-                Share
-            </button>
-        </div>
+      {/* Top-left Button */}
+      <div className="absolute top-4 left-4 z-30">
+          <button 
+              onClick={onStartOver}
+              className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm"
+          >
+              <RotateCcwIcon className="w-4 h-4 mr-2" />
+              Start Over
+          </button>
       </div>
       
-      {/* Save Confirmation Toast */}
-      <AnimatePresence>
-        {saveConfirmation && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-16 z-30 bg-green-100 border border-green-300 text-green-800 text-sm font-semibold px-4 py-2 rounded-full"
-          >
-            {saveConfirmation}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      {/* Top-right Buttons & Toast Container */}
+      <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-3">
+          <div className="flex items-center gap-2">
+              <button 
+                  onClick={onSaveOutfit}
+                  disabled={!canSave || isLoading}
+                  className="flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Save current outfit"
+              >
+                  <SaveIcon className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">Save Outfit</span>
+              </button>
+              <button 
+                  onClick={onShare}
+                  disabled={isLoading}
+                  className="flex items-center justify-center text-center bg-gray-900 text-white font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-gray-700 active:scale-95 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-500"
+                  aria-label="Share current outfit"
+              >
+                  <ShareIcon className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">Share</span>
+              </button>
+          </div>
+          {/* Save Confirmation Toast */}
+          <AnimatePresence>
+            {saveConfirmation && (
+              <motion.div
+                layout
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                transition={{ ease: "easeOut", duration: 0.3 }}
+                className="flex items-center gap-3 bg-white border border-green-200 shadow-lg rounded-lg p-3 max-w-xs"
+                role="status"
+                aria-live="polite"
+              >
+                <CheckCircleIcon className="w-6 h-6 text-green-500 flex-shrink-0" />
+                <p className="text-green-800 text-sm font-semibold">
+                  {saveConfirmation}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+      </div>
 
       {/* Image Display or Placeholder */}
       <div className="relative w-full h-full flex items-center justify-center">
